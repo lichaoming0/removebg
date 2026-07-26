@@ -1,0 +1,8 @@
+name = "removebg"
+compatibility_date = "2025-07-26"
+pages_build_output_dir = "dist"
+
+[env.production]
+vars = {}
+
+# Set secrets via: wrangler secret put REMOVE_BG_API_KEY
