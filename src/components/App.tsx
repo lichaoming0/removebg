@@ -1,6 +1,7 @@
 import React, { useReducer, useCallback, useRef } from 'react';
 import Header from './Header';
 import UploadZone from './UploadZone';
+import NotesCard from './NotesCard';
 import Editor from './Editor';
 import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
 
@@ -22,7 +23,6 @@ type AppAction =
 function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'UPLOAD':
-      // Clean up old blob URL if any
       if (state.phase !== 'idle') {
         URL.revokeObjectURL(state.originalUrl);
       }
@@ -45,10 +45,8 @@ function reducer(state: AppState, action: AppAction): AppState {
         error: action.error,
       };
 
-    case 'RESET': {
-      // Cleanup will be handled in the component using the url ref
+    case 'RESET':
       return { phase: 'idle' };
-    }
 
     default:
       return state;
@@ -59,13 +57,11 @@ const App: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
   const { resultBlob, resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
 
-  // Track current original URL for cleanup
   const originalUrlRef = useRef<string | null>(null);
 
   const handleImage = useCallback(
     (file: File) => {
       const url = URL.createObjectURL(file);
-      // Clean up previous original URL
       if (originalUrlRef.current) URL.revokeObjectURL(originalUrlRef.current);
       originalUrlRef.current = url;
       resetRemoval();
@@ -80,24 +76,19 @@ const App: React.FC = () => {
     dispatch({ type: 'START_PROCESSING' });
     try {
       await process(original);
-      // Check that the hook's state updated — process is async.
-      // We need to wait a tick for React state to settle.
-      // Use a microtask:
       await new Promise((r) => setTimeout(r, 0));
       dispatch({ type: 'PROCESS_SUCCESS' });
     } catch {
-      // error is already set in the hook; read it below
+      // error synced via useEffect below
     }
   }, [state, process]);
 
-  // Sync hook error back to AppState
   React.useEffect(() => {
     if (error && state.phase === 'processing') {
       dispatch({ type: 'PROCESS_ERROR', error });
     }
   }, [error, state.phase]);
 
-  // Sync hook success back to AppState
   React.useEffect(() => {
     if (resultUrl && state.phase === 'processing' && !loading && !error) {
       dispatch({ type: 'PROCESS_SUCCESS' });
@@ -113,7 +104,6 @@ const App: React.FC = () => {
     dispatch({ type: 'RESET' });
   }, [resetRemoval]);
 
-  // Cleanup on unmount
   React.useEffect(() => {
     return () => {
       if (originalUrlRef.current) URL.revokeObjectURL(originalUrlRef.current);
@@ -124,7 +114,12 @@ const App: React.FC = () => {
     <div className="app-container">
       <Header />
       <main className="app-main">
-        {state.phase === 'idle' && <UploadZone onImage={handleImage} />}
+        {state.phase === 'idle' && (
+          <>
+            <UploadZone onImage={handleImage} />
+            <NotesCard />
+          </>
+        )}
 
         {(state.phase === 'uploaded' ||
           state.phase === 'processing' ||
@@ -143,7 +138,8 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="app-footer">
-        Remove backgrounds from your images — powered by remove.bg API
+        <span className="app-footer-divider" />
+        <p>Powered by remove.bg API · Images processed in browser memory — nothing stored, nothing logged</p>
       </footer>
     </div>
   );
