@@ -55,7 +55,7 @@ function reducer(state: AppState, action: AppAction): AppState {
 
 const App: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
-  const { resultBlob, resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
+  const { resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
 
   const originalUrlRef = useRef<string | null>(null);
 
@@ -130,7 +130,6 @@ const App: React.FC = () => {
             originalUrl={state.originalUrl}
             phase={state.phase}
             resultUrl={resultUrl}
-            resultBlob={resultBlob}
             error={state.phase === 'error' ? state.error : null}
             onRemoveBg={handleRemoveBg}
             onReset={handleReset}

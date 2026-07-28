@@ -11,7 +11,6 @@ interface EditorProps {
   originalUrl: string;
   phase: 'uploaded' | 'processing' | 'done' | 'error';
   resultUrl?: string | null;
-  resultBlob?: Blob | null;
   error?: string | null;
   onRemoveBg: () => void;
   onReset: () => void;
@@ -22,7 +21,6 @@ const Editor: React.FC<EditorProps> = ({
   originalUrl,
   phase,
   resultUrl,
-  resultBlob,
   error,
   onRemoveBg,
   onReset,
