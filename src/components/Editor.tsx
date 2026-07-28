@@ -3,7 +3,7 @@ import ImagePreview from './ImagePreview';
 import BackgroundPicker from './BackgroundPicker';
 import Toolbar from './Toolbar';
 import ErrorBanner from './ErrorBanner';
-import { compositeImage, downloadBlob } from '../utils/canvas';
+import { compositeImage } from '../utils/canvas';
 import type { BackgroundOption } from '../utils/canvas';
 
 interface EditorProps {
@@ -70,20 +70,16 @@ const Editor: React.FC<EditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleDownload = async () => {
-    if (!compositeUrl) return;
-    try {
-      const response = await fetch(compositeUrl);
-      const blob = await response.blob();
-      const originalName = original.name.replace(/\.[^.]+$/, '');
-      downloadBlob(blob, `${originalName}_no_bg.png`);
-    } catch {
-      // Fallback: try direct blob if available
-      if (resultBlob) {
-        const originalName = original.name.replace(/\.[^.]+$/, '');
-        downloadBlob(resultBlob, `${originalName}_no_bg.png`);
-      }
-    }
+  const handleDownload = () => {
+    const downloadUrl = compositeUrl || resultUrl;
+    if (!downloadUrl) return;
+    const originalName = original.name.replace(/\.[^.]+$/, '');
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `${originalName}_no_bg.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   // Compute background style for the preview pane
