@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import ImagePreview from './ImagePreview';
 import BackgroundPicker from './BackgroundPicker';
 import Toolbar from './Toolbar';
@@ -25,10 +25,13 @@ const Editor: React.FC<EditorProps> = ({
   onRemoveBg,
   onReset,
 }) => {
-  // Background state
-  const [background, setBackground] = React.useState<BackgroundOption>({ type: 'transparent' });
-  const [compositeUrl, setCompositeUrl] = React.useState<string | null>(null);
-  const [compositing, setCompositing] = React.useState(false);
+  const [background, setBackground] = useState<BackgroundOption>({ type: 'transparent' });
+  const [compositeUrl, setCompositeUrl] = useState<string | null>(null);
+  const [compositing, setCompositing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // Track previous composite URL for cleanup
+  const prevCompositeRef = useRef<string | null>(null);
 
   // Re-composite whenever result or background changes
   useEffect(() => {
@@ -41,46 +44,64 @@ const Editor: React.FC<EditorProps> = ({
     setCompositing(true);
     compositeImage(resultUrl, background)
       .then((url) => {
-        if (!cancelled) {
-          // Revoke previous composite URL
-          if (compositeUrl) URL.revokeObjectURL(compositeUrl);
-          setCompositeUrl(url);
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
         }
+        if (prevCompositeRef.current) URL.revokeObjectURL(prevCompositeRef.current);
+        prevCompositeRef.current = url;
+        setCompositeUrl(url);
       })
       .catch(() => {
-        if (!cancelled) setCompositeUrl(resultUrl); // fallback to raw result
+        if (!cancelled) setCompositeUrl(resultUrl);
       })
       .finally(() => {
         if (!cancelled) setCompositing(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
+    // compositeUrl intentionally omitted from deps — we use ref for cleanup
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultUrl, background]);
 
-  // Cleanup composite URL on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (compositeUrl) URL.revokeObjectURL(compositeUrl);
+      if (prevCompositeRef.current) URL.revokeObjectURL(prevCompositeRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleDownload = () => {
-    const downloadUrl = compositeUrl || resultUrl;
-    if (!downloadUrl) return;
-    const originalName = original.name.replace(/\.[^.]+$/, '');
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `${originalName}_no_bg.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  // Download: always composite fresh from the raw result to avoid stale URLs
+  const handleDownload = useCallback(async () => {
+    const sourceUrl = resultUrl;
+    if (!sourceUrl) return;
 
-  // Compute background style for the preview pane
+    setDownloading(true);
+    try {
+      const downloadUrl = await compositeImage(sourceUrl, background);
+      const originalName = original.name.replace(/\.[^.]+$/, '');
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `${originalName}_no_bg.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Delay revoke so browser can start the download
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch {
+      // Fallback: download raw result directly
+      const originalName = original.name.replace(/\.[^.]+$/, '');
+      const a = document.createElement('a');
+      a.href = sourceUrl;
+      a.download = `${originalName}_no_bg.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      setDownloading(false);
+    }
+  }, [resultUrl, background, original.name]);
+
   const backgroundStyle: React.CSSProperties | undefined =
     background.type === 'color'
       ? { backgroundColor: background.value }
@@ -105,7 +126,7 @@ const Editor: React.FC<EditorProps> = ({
         <BackgroundPicker
           value={background}
           onChange={setBackground}
-          disabled={compositing}
+          disabled={compositing || downloading}
         />
       )}
 
