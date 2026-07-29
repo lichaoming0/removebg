@@ -95,7 +95,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 0;
+  padding: 14px 24px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   background: rgba(255, 255, 255, 0.48);
@@ -109,11 +109,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
 .header-right {
   display: flex;
   align-items: center;
+  min-width: 160px;
+  justify-content: flex-end;
 }
 
 .header-logo-svg {
