@@ -1,4 +1,5 @@
 import React, { useReducer, useCallback, useRef } from 'react';
+import { AuthProvider } from '../context/AuthContext';
 import Header from './Header';
 import UploadZone from './UploadZone';
 import NotesCard from './NotesCard';
@@ -53,7 +54,7 @@ function reducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
   const { resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
 
@@ -143,5 +144,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <AuthProvider>
+    <AppContent />
+  </AuthProvider>
+);
 
 export default App;

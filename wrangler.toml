@@ -2,6 +2,13 @@ name = "removebg"
 compatibility_date = "2025-07-26"
 pages_build_output_dir = "dist"
 
+# D1 database binding — create via: npx wrangler d1 create removebg-db
+# Then copy the database_id here and to Cloudflare Pages dashboard
+[[d1_databases]]
+binding = "DB"
+database_name = "removebg-db"
+database_id = "YOUR_D1_DATABASE_ID"
+
 [env.production]
 vars = {}
 
