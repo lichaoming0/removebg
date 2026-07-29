@@ -1,14 +1,3 @@
 name = "removebg"
 compatibility_date = "2025-07-26"
 pages_build_output_dir = "dist"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "removebg-db"
-database_id = "7a06a2fe-90d7-492a-9c61-9ef6a651b710"
-
-[vars]
-GOOGLE_CLIENT_ID = "974859501286-sa67i61lon92g2d77ap1m2pv5d4memtb.apps.googleusercontent.com"
-
-[env.production]
-vars = {}
