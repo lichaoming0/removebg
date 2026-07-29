@@ -7,12 +7,14 @@ const GoogleLoginButton: React.FC = () => {
   const [loginError, setLoginError] = React.useState('');
 
   const googleLogin = useGoogleLogin({
+    flow: 'auth-code',
     onSuccess: async (tokenResponse) => {
       setLoginError('');
       try {
-        await login(tokenResponse.access_token);
-      } catch {
-        setLoginError('Login failed. Please try again.');
+        // tokenResponse.code is the authorization code
+        await login(tokenResponse.code);
+      } catch (err: any) {
+        setLoginError(err.message || 'Login failed. Please try again.');
       }
     },
     onError: () => {
@@ -22,7 +24,7 @@ const GoogleLoginButton: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />
+      <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e5e7eb' }} />
     );
   }
 

@@ -1,54 +1,94 @@
 /**
  * POST /api/auth/login
- * Body: { access_token: string }
- * Verifies Google access token, upserts user in D1, returns user info.
+ * Body: { code: string }
+ * Exchanges Google auth code for tokens, verifies user, upserts in D1.
  */
 interface Env {
   DB: D1Database;
-  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // Parse request body
-  let accessToken: string;
+  let code: string;
   try {
-    const body = await request.json() as { access_token?: string };
-    accessToken = body.access_token || '';
+    const body = await request.json() as { code?: string };
+    code = body.code || '';
   } catch {
     return json({ error: 'Invalid request' }, 400);
   }
 
-  if (!accessToken) {
-    return json({ error: 'Missing access_token' }, 400);
+  if (!code) {
+    return json({ error: 'Missing auth code' }, 400);
   }
 
-  // Verify token with Google
+  const clientId = env.GOOGLE_CLIENT_ID || '974859501286-sa67i61lon92g2d77ap1m2pv5d4memtb.apps.googleusercontent.com';
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+  if (!clientSecret) {
+    return json({ error: 'Server not configured: missing Google client secret' }, 500);
+  }
+  const redirectUri = 'https://removeimagesbg.shop';
+
+  // Step 1: Exchange auth code for tokens
+  let idToken: string;
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      const err = await tokenRes.text();
+      console.error('Token exchange failed:', err);
+      return json({ error: 'Invalid auth code' }, 401);
+    }
+
+    const tokens = await tokenRes.json() as { id_token?: string; access_token?: string };
+    idToken = tokens.id_token || '';
+    if (!idToken) {
+      return json({ error: 'No id_token in response' }, 500);
+    }
+  } catch (err: any) {
+    console.error('Token exchange error:', err.message);
+    return json({ error: 'Failed to verify with Google' }, 500);
+  }
+
+  // Step 2: Decode the id_token (it's a JWT) to get user info
+  // The id_token contains: sub, name, email, picture, etc.
   let userInfo: { sub: string; name: string; email: string; picture?: string };
   try {
-    const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!googleRes.ok) {
-      return json({ error: 'Invalid Google token' }, 401);
-    }
-    userInfo = await googleRes.json() as typeof userInfo;
+    // JWT payload is base64url encoded in the middle segment
+    const payload = idToken.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    userInfo = {
+      sub: decoded.sub,
+      name: decoded.name || '',
+      email: decoded.email || '',
+      picture: decoded.picture || '',
+    };
   } catch {
-    return json({ error: 'Failed to verify Google token' }, 500);
+    return json({ error: 'Failed to parse id_token' }, 500);
   }
 
   if (!userInfo.sub || !userInfo.email) {
     return json({ error: 'Incomplete user info from Google' }, 400);
   }
 
-  // Upsert user in D1
+  // Step 3: Upsert user in D1
   try {
-    // Check if user exists
     const existing = await env.DB.prepare(
       'SELECT id, google_id, name, email, picture FROM users WHERE google_id = ?'
     ).bind(userInfo.sub).first<{ id: number; google_id: string; name: string; email: string; picture: string | null }>();
 
     if (existing) {
-      // Update last_login and optionally name/picture
       await env.DB.prepare(
         'UPDATE users SET name = ?, email = ?, picture = ?, last_login = datetime(\'now\') WHERE google_id = ?'
       ).bind(userInfo.name, userInfo.email, userInfo.picture || '', userInfo.sub).run();
@@ -63,7 +103,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         },
       });
     } else {
-      // Insert new user
       const result = await env.DB.prepare(
         'INSERT INTO users (google_id, name, email, picture) VALUES (?, ?, ?, ?)'
       ).bind(userInfo.sub, userInfo.name, userInfo.email, userInfo.picture || '').run();
