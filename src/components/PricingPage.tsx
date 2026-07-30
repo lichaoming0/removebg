@@ -58,11 +58,10 @@ const POLICIES = [
 const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, credits, addCredits } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [credits, setCredits] = useState(() => parseInt(localStorage.getItem('removebg_credits') || '0', 10));
 
   // Load PayPal SDK
   useEffect(() => {
@@ -99,16 +98,14 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         });
         const result = await res.json();
         if (result.success) {
-          const newCredits = credits + result.credits;
-          setCredits(newCredits);
-          localStorage.setItem('removebg_credits', String(newCredits));
+          addCredits(result.credits);
           setStatus('success');
         }
       },
       onCancel: () => { setStatus('cancel'); },
       onError: (err: any) => { console.error('PayPal error:', err); },
     }).render(`#${containerId}`);
-  }, [credits]);
+  }, [addCredits]);
 
   useEffect(() => {
     if (selectedPlan) {

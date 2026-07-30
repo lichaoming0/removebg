@@ -14,6 +14,8 @@ interface AuthContextType {
   logout: () => void;
   isLoggedIn: boolean;
   loading: boolean;
+  credits: number;
+  addCredits: (amount: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,21 +24,24 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   isLoggedIn: false,
   loading: true,
+  credits: 0,
+  addCredits: () => {},
 });
 
-const STORAGE_KEY = 'removebg_user';
+const USER_STORAGE_KEY = 'removebg_user';
+const CREDITS_STORAGE_KEY = 'removebg_credits';
 
 function saveUser(user: GoogleUser) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
 function clearUser() {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(USER_STORAGE_KEY);
 }
 
 function loadUser(): GoogleUser | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
     if (!raw) return null;
     const user = JSON.parse(raw) as GoogleUser;
     if (!user.email) return null;
@@ -46,9 +51,18 @@ function loadUser(): GoogleUser | null {
   }
 }
 
+function loadCredits(): number {
+  return parseInt(localStorage.getItem(CREDITS_STORAGE_KEY) || '0', 10) || 0;
+}
+
+function saveCredits(credits: number) {
+  localStorage.setItem(CREDITS_STORAGE_KEY, String(credits));
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<GoogleUser | null>(loadUser);
   const [loading, setLoading] = useState(false);
+  const [credits, setCredits] = useState(loadCredits);
 
   const login = useCallback(async (code: string) => {
     setLoading(true);
@@ -77,8 +91,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearUser();
   }, []);
 
+  const addCredits = useCallback((amount: number) => {
+    setCredits((prev) => {
+      const next = prev + amount;
+      saveCredits(next);
+      return next;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading, credits, addCredits }}>
       {children}
     </AuthContext.Provider>
   );

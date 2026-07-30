@@ -131,6 +131,21 @@ body {
 }
 .header-pricing-link:hover { color: var(--color-primary); }
 
+.header-credits {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(59, 130, 246, 0.06));
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+  user-select: none;
+}
+
 .header-logo-svg {
   width: 36px;
   height: 36px;

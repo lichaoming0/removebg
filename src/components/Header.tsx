@@ -1,5 +1,6 @@
 import React from 'react';
 import GoogleLoginButton from './GoogleLoginButton';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   title?: string;
@@ -40,19 +41,26 @@ const LogoSvg = () => (
   </svg>
 );
 
-const Header: React.FC<HeaderProps> = ({ title = 'Image Background Remover', onPricing }) => (
+const Header: React.FC<HeaderProps> = ({ title = 'Image Background Remover', onPricing }) => {
+  const { credits, isLoggedIn } = useAuth();
+  return (
   <header className="header">
     <div className="header-left">
       <LogoSvg />
       <h1 className="header-title">{title}</h1>
     </div>
     <div className="header-right" style={{ gap: 16 }}>
+      {isLoggedIn && credits > 0 && (
+        <span className="header-credits" title={`${credits} credits remaining`}>
+          🪙 {credits}
+        </span>
+      )}
       {onPricing && (
         <button onClick={onPricing} className="header-pricing-link">Pricing</button>
       )}
       <GoogleLoginButton />
     </div>
   </header>
-);
+)};
 
 export default Header;
