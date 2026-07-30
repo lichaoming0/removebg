@@ -16,78 +16,66 @@ const PLANS: Plan[] = [
     name: 'Free',
     price: '$0',
     period: 'forever',
-    images: '5',
+    images: '1',
     pricePerImage: 'Free',
     highlighted: false,
     cta: 'Get Started',
     features: [
-      '5 HD images per month',
-      'Full resolution PNG output',
-      'Transparent & solid backgrounds',
-      'Drag & drop upload',
-      'Standard support',
+      '1 HD image per month',
+      'Only charged on success',
+      'Full resolution PNG',
+      'All background options',
+      'Standard processing',
     ],
   },
   {
     name: 'Starter',
-    price: '$12',
+    price: '$5.99',
     period: '/month',
-    images: '50',
-    pricePerImage: '$0.24',
+    images: '20',
+    pricePerImage: '$0.30',
     highlighted: true,
     cta: 'Subscribe Now',
     features: [
-      '50 HD images per month',
-      'Full resolution PNG output',
+      '20 HD images per month',
+      'Only charged on success',
+      'Full resolution PNG',
       'All background options',
       'Priority processing',
-      'Email support',
-      'No watermark',
+      'Unused credits expire monthly',
     ],
   },
   {
     name: 'Pro',
-    price: '$29',
+    price: '$22.99',
     period: '/month',
-    images: '200',
-    pricePerImage: '$0.15',
+    images: '80',
+    pricePerImage: '$0.29',
     highlighted: false,
     cta: 'Subscribe Now',
     features: [
-      '200 HD images per month',
-      'Full resolution PNG output',
+      '80 HD images per month',
+      'Only charged on success',
+      'Full resolution PNG',
       'All background options',
-      'Fastest processing queue',
-      'Priority email support',
-      'API access (coming soon)',
+      'Fastest processing',
+      'Unused credits expire monthly',
     ],
   },
-  {
-    name: 'Business',
-    price: '$59',
-    period: '/month',
-    images: '500',
-    pricePerImage: '$0.12',
-    highlighted: false,
-    cta: 'Contact Us',
-    features: [
-      '500 HD images per month',
-      'Full resolution PNG output',
-      'All background options',
-      'Dedicated support',
-      'API access (coming soon)',
-      'Volume discount',
-      'Custom integration help',
-    ],
-  },
+];
+
+const POLICIES = [
+  { icon: '✅', title: 'Only on success', desc: 'Credit is consumed only when background removal succeeds. Failed attempts are free.' },
+  { icon: '📢', title: 'Over-limit notice', desc: 'When you reach your monthly limit, you\'ll be prompted to upgrade. No automatic charges.' },
+  { icon: '📅', title: 'Monthly reset', desc: 'Credits reset each billing month. Unused credits do not roll over.' },
 ];
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div className="pricing-overlay">
     <div className="pricing-container">
       <div className="pricing-header">
-        <h2>Simple, transparent pricing</h2>
-        <p>Powered by remove.bg AI engine. Cancel anytime.</p>
+        <h2>Simple, fair pricing</h2>
+        <p>You only pay when it works. No hidden fees, no auto-charge.</p>
         <button className="pricing-close" onClick={onClose}>×</button>
       </div>
 
@@ -124,8 +112,20 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => (
         ))}
       </div>
 
+      <div className="pricing-policies">
+        {POLICIES.map((p) => (
+          <div key={p.title} className="policy-item">
+            <span className="policy-icon">{p.icon}</span>
+            <div>
+              <strong>{p.title}</strong>
+              <p>{p.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <p className="pricing-footer-note">
-        Need more? <a href="mailto:lichaoming0@gmail.com">Contact us</a> for enterprise pricing.
+        Need more than 80 images/month? <a href="mailto:lichaoming0@gmail.com">Contact us</a> for a custom plan.
       </p>
     </div>
   </div>
