@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 interface Plan {
   key: string;
@@ -57,8 +58,10 @@ const POLICIES = [
 const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { isLoggedIn } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [credits, setCredits] = useState(() => parseInt(localStorage.getItem('removebg_credits') || '0', 10));
 
   // Load PayPal SDK
@@ -188,7 +191,10 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </ul>
                 <button
                   className="pricing-cta primary"
-                  onClick={() => setSelectedPlan(plan.key)}
+                  onClick={() => {
+                    if (!isLoggedIn) { setShowLoginPrompt(true); return; }
+                    setSelectedPlan(plan.key);
+                  }}
                 >
                   Buy Now
                 </button>
@@ -197,7 +203,21 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
-        {selectedPlan && (
+        {selectedPlan && showLoginPrompt && (
+          <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
+            <button onClick={() => { setShowLoginPrompt(false); setSelectedPlan(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>
+              ← Back to plans
+            </button>
+            <h3 style={{ marginBottom: 12 }}>Sign in required</h3>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 20, fontSize: 14 }}>
+              Please sign in with your Google account before purchasing to associate credits with your account.
+            </p>
+            <button className="pricing-cta secondary" onClick={() => { setShowLoginPrompt(false); setSelectedPlan(null); onClose(); }}>
+              Close & Sign In
+            </button>
+          </div>
+        )}
+        {selectedPlan && isLoggedIn && !showLoginPrompt && (
           <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
             <button onClick={() => setSelectedPlan(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>
               ← Back to plans

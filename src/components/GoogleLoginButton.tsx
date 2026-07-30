@@ -11,20 +11,29 @@ const GoogleLoginButton: React.FC = () => {
     onSuccess: async (tokenResponse) => {
       setLoginError('');
       try {
-        // tokenResponse.code is the authorization code
         await login(tokenResponse.code);
       } catch (err: any) {
         setLoginError(err.message || 'Login failed. Please try again.');
       }
     },
-    onError: () => {
-      setLoginError('Google sign-in was cancelled or failed.');
+    onError: (errorResponse) => {
+      console.error('Google OAuth error:', errorResponse);
+      setLoginError('Google sign-in failed. Check console for details.');
+    },
+    onNonOAuthError: (nonOAuthError) => {
+      console.error('Non-OAuth error:', nonOAuthError);
+      const msg = nonOAuthError.type === 'popup_failed_to_open'
+        ? 'Popup blocked. Please allow popups for this site.'
+        : nonOAuthError.type === 'popup_closed'
+          ? 'Sign-in window was closed. Please try again.'
+          : `Sign-in error: ${nonOAuthError.type}`;
+      setLoginError(msg);
     },
   });
 
   if (loading) {
     return (
-      <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e5e7eb' }} />
+      <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />
     );
   }
 
@@ -102,7 +111,9 @@ const GoogleLoginButton: React.FC = () => {
         Sign in with Google
       </button>
       {loginError && (
-        <span style={{ fontSize: 12, color: 'var(--color-error)' }}>{loginError}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-error)', maxWidth: 200, textAlign: 'right' }}>
+          {loginError}
+        </span>
       )}
     </div>
   );
