@@ -192,8 +192,8 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <button
                   className="pricing-cta primary"
                   onClick={() => {
-                    if (!isLoggedIn) { setShowLoginPrompt(true); return; }
                     setSelectedPlan(plan.key);
+                    if (!isLoggedIn) { setShowLoginPrompt(true); return; }
                   }}
                 >
                   Buy Now
