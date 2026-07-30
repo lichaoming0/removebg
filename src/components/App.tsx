@@ -1,9 +1,10 @@
-import React, { useReducer, useCallback, useRef } from 'react';
+import React, { useReducer, useCallback, useRef, useState } from 'react';
 import { AuthProvider } from '../context/AuthContext';
 import Header from './Header';
 import UploadZone from './UploadZone';
 import NotesCard from './NotesCard';
 import Editor from './Editor';
+import PricingPage from './PricingPage';
 import { useBackgroundRemoval } from '../hooks/useBackgroundRemoval';
 
 // ---- State machine ----
@@ -57,6 +58,7 @@ function reducer(state: AppState, action: AppAction): AppState {
 const AppContent: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
   const { resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
+  const [showPricing, setShowPricing] = useState(false);
 
   const originalUrlRef = useRef<string | null>(null);
 
@@ -113,7 +115,8 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="app-container">
-      <Header />
+      <Header onPricing={() => setShowPricing(true)} />
+      {showPricing && <PricingPage onClose={() => setShowPricing(false)} />}
       <main className="app-main">
         {state.phase === 'idle' && (
           <>

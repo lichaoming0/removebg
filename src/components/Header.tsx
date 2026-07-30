@@ -3,6 +3,7 @@ import GoogleLoginButton from './GoogleLoginButton';
 
 interface HeaderProps {
   title?: string;
+  onPricing?: () => void;
 }
 
 const LogoSvg = () => (
@@ -39,13 +40,16 @@ const LogoSvg = () => (
   </svg>
 );
 
-const Header: React.FC<HeaderProps> = ({ title = 'Image Background Remover' }) => (
+const Header: React.FC<HeaderProps> = ({ title = 'Image Background Remover', onPricing }) => (
   <header className="header">
     <div className="header-left">
       <LogoSvg />
       <h1 className="header-title">{title}</h1>
     </div>
-    <div className="header-right">
+    <div className="header-right" style={{ gap: 16 }}>
+      {onPricing && (
+        <button onClick={onPricing} className="header-pricing-link">Pricing</button>
+      )}
       <GoogleLoginButton />
     </div>
   </header>
