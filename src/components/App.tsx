@@ -1,5 +1,5 @@
-import React, { useReducer, useCallback, useRef, useState } from 'react';
-import { AuthProvider } from '../context/AuthContext';
+import React, { useReducer, useCallback, useRef, useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from '../context/AuthContext';
 import Header from './Header';
 import UploadZone from './UploadZone';
 import NotesCard from './NotesCard';
@@ -59,8 +59,16 @@ const AppContent: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
   const { resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
   const [showPricing, setShowPricing] = useState(false);
+  const { isLoggedIn, syncCredits } = useAuth();
 
   const originalUrlRef = useRef<string | null>(null);
+
+  // Sync credits from server on mount (if logged in)
+  useEffect(() => {
+    if (isLoggedIn) {
+      syncCredits();
+    }
+  }, [isLoggedIn, syncCredits]);
 
   const handleImage = useCallback(
     (file: File) => {
@@ -86,13 +94,13 @@ const AppContent: React.FC = () => {
     }
   }, [state, process]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (error && state.phase === 'processing') {
       dispatch({ type: 'PROCESS_ERROR', error });
     }
   }, [error, state.phase]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (resultUrl && state.phase === 'processing' && !loading && !error) {
       dispatch({ type: 'PROCESS_SUCCESS' });
     }
@@ -107,7 +115,7 @@ const AppContent: React.FC = () => {
     dispatch({ type: 'RESET' });
   }, [resetRemoval]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (originalUrlRef.current) URL.revokeObjectURL(originalUrlRef.current);
     };

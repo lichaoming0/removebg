@@ -62,14 +62,23 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [paypalReady, setPaypalReady] = useState(false);
 
-  // Load PayPal SDK
+  // Load PayPal SDK with onload callback
   useEffect(() => {
-    if (document.querySelector('#paypal-sdk')) return;
+    if (document.querySelector('#paypal-sdk')) {
+      // Script already exists — check if already loaded
+      if ((window as any).paypal) {
+        setPaypalReady(true);
+      }
+      return;
+    }
     const script = document.createElement('script');
     script.id = 'paypal-sdk';
     script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
     script.async = true;
+    script.onload = () => setPaypalReady(true);
+    script.onerror = () => console.error('PayPal SDK failed to load');
     document.body.appendChild(script);
   }, []);
 
@@ -108,11 +117,12 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, [addCredits, user?.google_id]);
 
   useEffect(() => {
-    if (selectedPlan) {
-      const timer = setTimeout(() => renderButton('paypal-btn-container', selectedPlan), 300);
+    if (selectedPlan && paypalReady) {
+      // Small delay to ensure DOM is painted
+      const timer = setTimeout(() => renderButton('paypal-btn-container', selectedPlan), 50);
       return () => clearTimeout(timer);
     }
-  }, [selectedPlan, renderButton]);
+  }, [selectedPlan, paypalReady, renderButton]);
 
   if (status === 'success') {
     const plan = PLANS.find((p) => p.key === selectedPlan);

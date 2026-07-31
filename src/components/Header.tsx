@@ -50,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({ title = 'Image Background Remover', onP
       <h1 className="header-title">{title}</h1>
     </div>
     <div className="header-right" style={{ gap: 16 }}>
-      {isLoggedIn && credits > 0 && (
+      {isLoggedIn && (
         <span className="header-credits" title={`${credits} credits remaining`}>
           🪙 {credits}
         </span>
