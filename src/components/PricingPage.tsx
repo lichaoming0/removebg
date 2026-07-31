@@ -58,7 +58,7 @@ const POLICIES = [
 const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { isLoggedIn, credits, addCredits } = useAuth();
+  const { isLoggedIn, credits, addCredits, user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -94,7 +94,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const res = await fetch('/api/paypal/capture-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: data.orderId, plan: planKey }),
+          body: JSON.stringify({ orderId: data.orderId, plan: planKey, google_id: user?.google_id || '' }),
         });
         const result = await res.json();
         if (result.success) {
@@ -105,7 +105,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       onCancel: () => { setStatus('cancel'); },
       onError: (err: any) => { console.error('PayPal error:', err); },
     }).render(`#${containerId}`);
-  }, [addCredits]);
+  }, [addCredits, user?.google_id]);
 
   useEffect(() => {
     if (selectedPlan) {

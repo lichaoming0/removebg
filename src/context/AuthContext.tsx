@@ -6,6 +6,7 @@ interface GoogleUser {
   name: string;
   email: string;
   picture: string;
+  credits: number;
 }
 
 interface AuthContextType {
@@ -16,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   credits: number;
   addCredits: (amount: number) => void;
+  syncCredits: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   credits: 0,
   addCredits: () => {},
+  syncCredits: async () => {},
 });
 
 const USER_STORAGE_KEY = 'removebg_user';
@@ -76,6 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         setUser(data.user);
         saveUser(data.user);
+        // Sync credits from server
+        const serverCredits = data.user.credits || 0;
+        setCredits(serverCredits);
+        saveCredits(serverCredits);
       } else {
         throw new Error(data.error || 'Login failed');
       }
@@ -99,8 +106,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const syncCredits = useCallback(async () => {
+    const u = loadUser();
+    if (!u) return;
+    try {
+      const res = await fetch(`/api/auth/me?google_id=${encodeURIComponent(u.google_id)}`);
+      const data = await res.json();
+      if (data.user && typeof data.user.credits === 'number') {
+        setCredits(data.user.credits);
+        saveCredits(data.user.credits);
+        // Also update the stored user object
+        const updated = { ...u, credits: data.user.credits };
+        saveUser(updated);
+        setUser(updated);
+      }
+    } catch {
+      // silently fail — use cached credits
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading, credits, addCredits }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading, credits, addCredits, syncCredits }}>
       {children}
     </AuthContext.Provider>
   );

@@ -54,15 +54,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // Upsert in D1
   try {
-    const exist = await env.DB.prepare('SELECT id FROM users WHERE google_id = ?').bind(sub).first<{id:number}>();
+    const exist = await env.DB.prepare('SELECT id, credits FROM users WHERE google_id = ?').bind(sub).first<{id:number; credits:number}>();
     if (exist) {
       await env.DB.prepare('UPDATE users SET name=?, email=?, picture=?, last_login=datetime(\'now\') WHERE google_id=?')
         .bind(name, email, picture, sub).run();
-      return json({ user: { id: exist.id, google_id: sub, name, email, picture } });
+      return json({ user: { id: exist.id, google_id: sub, name, email, picture, credits: exist.credits || 0 } });
     }
-    const ins = await env.DB.prepare('INSERT INTO users (google_id,name,email,picture) VALUES (?,?,?,?)')
+    const ins = await env.DB.prepare('INSERT INTO users (google_id,name,email,picture,credits) VALUES (?,?,?,?,0)')
       .bind(sub, name, email, picture).run();
-    return json({ user: { id: ins.meta?.last_row_id || 0, google_id: sub, name, email, picture } }, 201);
+    return json({ user: { id: ins.meta?.last_row_id || 0, google_id: sub, name, email, picture, credits: 0 } }, 201);
   } catch (err: any) {
     console.error('D1 error:', err.message);
     return json({ error: 'Database error' }, 500);
