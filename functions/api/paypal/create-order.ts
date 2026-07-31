@@ -15,8 +15,9 @@ const PLANS: Record<string, { name: string; price: string; credits: number }> = 
 const PAYPAL_BASE = 'https://api-m.sandbox.paypal.com';
 
 async function getAccessToken(env: Env): Promise<string> {
-  const id = env.PAYPAL_CLIENT_ID || 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
-  const secret = env.PAYPAL_CLIENT_SECRET || 'ELQAf55dJrvguVzaKNMrQM-xTW3sApHIR-jGOQSiaJIKXw6Jh3qNu4UEcwe1_ef1p35ADToplaXglqUE';
+  const id = env.PAYPAL_CLIENT_ID;
+  const secret = env.PAYPAL_CLIENT_SECRET;
+  if (!id || !secret) throw new Error('PayPal credentials not configured');
   const auth = btoa(`${id}:${secret}`);
   const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: 'POST',
