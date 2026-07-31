@@ -1,18 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-interface Plan {
-  key: string;
-  name: string;
-  price: string;
-  period: string;
-  images: string;
-  pricePerImage: string;
-  features: string[];
-  highlighted: boolean;
-}
-
-const PLANS: Plan[] = [
+const PLANS = [
   { key: 'starter', name: 'Starter', price: '$5.99', period: '/month', images: '20', pricePerImage: '$0.30', highlighted: true, features: ['20 HD images per month', 'Only charged on success', 'Full resolution PNG', 'All background options', 'Priority processing', 'Unused credits expire monthly'] },
   { key: 'pro', name: 'Pro', price: '$22.99', period: '/month', images: '80', pricePerImage: '$0.29', highlighted: false, features: ['80 HD images per month', 'Only charged on success', 'Full resolution PNG', 'All background options', 'Fastest processing', 'Unused credits expire monthly'] },
 ];
@@ -25,52 +14,44 @@ const POLICIES = [
 
 const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
 
-// Poll until window.paypal is available (max 10s)
-function waitForPaypal(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if ((window as any).paypal) { resolve(true); return; }
-    let n = 0;
-    const t = setInterval(() => {
-      n++;
-      if ((window as any).paypal) { clearInterval(t); resolve(true); return; }
-      if (n >= 100) { clearInterval(t); resolve(false); }
-    }, 100);
-  });
-}
-
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { isLoggedIn, credits, addCredits, user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [loadingPayPal, setLoadingPayPal] = useState(false);
-  const paypalRenderedRef = useRef(false);
+  const btnContainerRef = useRef<HTMLDivElement>(null);
+  const paypalBtnRef = useRef<any>(null);
   const userRef = useRef(user);
   const addCreditsRef = useRef(addCredits);
+  const planRef = useRef('');
   userRef.current = user;
   addCreditsRef.current = addCredits;
 
-  // Load PayPal SDK on mount
+  // Load PayPal SDK
   useEffect(() => {
     if (document.querySelector('#paypal-sdk')) return;
     const s = document.createElement('script');
     s.id = 'paypal-sdk';
-    s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+    s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`;
     s.async = true;
     document.body.appendChild(s);
+    s.onload = () => { console.log('PayPal SDK loaded'); };
+    s.onerror = () => { console.error('PayPal SDK load failed'); };
   }, []);
 
-  // Render PayPal button — called ONCE per plan selection, never re-called
-  const renderPaypalOnce = (planKey: string) => {
-    if (paypalRenderedRef.current) return; // already rendered, don't touch
-    const container = document.getElementById('paypal-btn-container');
-    if (!container) return;
-    const pp = (window as any).paypal;
-    if (!pp) return;
+  // When the PayPal container mounts + SDK is ready, render the button
+  useEffect(() => {
+    if (status !== 'loading') return;
+    const paypal = (window as any).paypal;
+    if (!paypal) return;
+    const el = btnContainerRef.current;
+    if (!el) return;
+    if (paypalBtnRef.current) return; // already rendered
 
-    paypalRenderedRef.current = true;
+    const planKey = planRef.current;
+    el.innerHTML = '';
 
-    pp.Buttons({
+    paypalBtnRef.current = paypal.Buttons({
       style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
       createOrder: async () => {
         const res = await fetch('/api/paypal/create-order', {
@@ -79,7 +60,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           body: JSON.stringify({ plan: planKey }),
         });
         const d = await res.json();
-        if (!d.orderId) throw new Error('Failed to create order');
+        if (!d.orderId) throw new Error(d.error || 'Failed to create order');
         return d.orderId;
       },
       onApprove: async (data: any) => {
@@ -92,46 +73,46 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         if (r.success) {
           addCreditsRef.current(r.credits);
           setStatus('success');
+        } else {
+          alert('Capture failed: ' + (r.error || 'Unknown'));
         }
       },
-      onCancel: () => { setStatus('cancel'); },
-      onError: (err: any) => { console.error('PayPal error:', err); alert('PayPal error: ' + (err?.message || 'Unknown error')); },
-    }).render('#paypal-btn-container');
+      onCancel: () => setStatus('cancel'),
+      onError: (err: any) => {
+        console.error('PayPal error:', err);
+        alert('PayPal error: ' + (err?.message || 'Unknown error'));
+      },
+    });
+    paypalBtnRef.current.render(el);
+  }, [status]);
+
+  // Cleanup PayPal button when unmounting or going back
+  const cleanupPaypal = () => {
+    if (paypalBtnRef.current) {
+      try { paypalBtnRef.current.close(); } catch {}
+      paypalBtnRef.current = null;
+    }
   };
 
-  // Buy Now handler
-  const handleBuyNow = async (planKey: string) => {
+  const handleBuyNow = (planKey: string) => {
     setSelectedPlan(planKey);
-    paypalRenderedRef.current = false;
+    planRef.current = planKey;
+    cleanupPaypal();
 
     if (!isLoggedIn) {
       setShowLoginPrompt(true);
       return;
     }
 
-    setLoadingPayPal(true);
-    const ready = await waitForPaypal();
-    setLoadingPayPal(false);
-    if (!ready) {
-      alert('PayPal SDK failed to load. Please check your network and try again.');
-      return;
-    }
-
-    // Retry until the container div exists (React may not have painted it yet)
-    let retries = 0;
-    const tryRender = () => {
-      const container = document.getElementById('paypal-btn-container');
-      if (container) {
-        renderPaypalOnce(planKey);
-      } else if (retries < 20) {
-        retries++;
-        setTimeout(tryRender, 100);
-      }
-    };
-    setTimeout(tryRender, 100);
+    setStatus('loading');
   };
 
-  // ---- Render states ----
+  const handleBackToPlans = () => {
+    cleanupPaypal();
+    setSelectedPlan(null);
+    setStatus('idle');
+    planRef.current = '';
+  };
 
   if (status === 'success') {
     const plan = PLANS.find(p => p.key === selectedPlan);
@@ -139,12 +120,8 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <div className="pricing-overlay"><div className="pricing-container" style={{ textAlign: 'center', maxWidth: 480 }}>
         <h2 style={{ fontSize: 32, marginBottom: 12 }}>🎉</h2>
         <h2>Payment Successful!</h2>
-        <p style={{ margin: '12px 0', fontSize: 16 }}>
-          You now have <strong>{credits} credits</strong> ({plan?.images} added).
-        </p>
-        <button className="pricing-cta primary" onClick={onClose} style={{ maxWidth: 240, margin: '16px auto' }}>
-          Start Removing Backgrounds
-        </button>
+        <p style={{ margin: '12px 0', fontSize: 16 }}>You now have <strong>{credits} credits</strong> ({plan?.images} added).</p>
+        <button className="pricing-cta primary" onClick={onClose} style={{ maxWidth: 240, margin: '16px auto' }}>Start Removing Backgrounds</button>
       </div></div>
     );
   }
@@ -155,9 +132,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <h2 style={{ fontSize: 32, marginBottom: 12 }}>💳</h2>
         <h2>Payment Cancelled</h2>
         <p style={{ margin: '12px 0', fontSize: 16 }}>No worries — you can try again whenever you're ready.</p>
-        <button className="pricing-cta secondary" onClick={() => setStatus('idle')} style={{ maxWidth: 200, margin: '16px auto' }}>
-          Back to Plans
-        </button>
+        <button className="pricing-cta secondary" onClick={() => setStatus('idle')} style={{ maxWidth: 200, margin: '16px auto' }}>Back to Plans</button>
       </div></div>
     );
   }
@@ -171,7 +146,6 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <button className="pricing-close" onClick={onClose}>×</button>
         </div>
 
-        {/* Plan grid */}
         {!selectedPlan && (
           <div className="pricing-grid">
             <div className="pricing-card">
@@ -179,9 +153,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <div className="pricing-price"><span className="price-amount">$0</span><span className="price-period">forever</span></div>
               <div className="pricing-images"><strong>1</strong> image/month</div>
               <div className="pricing-per-image">Free</div>
-              <ul className="pricing-features">
-                <li>✓ 1 HD image per month</li><li>✓ Only charged on success</li><li>✓ Full resolution PNG</li><li>✓ All background options</li><li>✓ Standard processing</li>
-              </ul>
+              <ul className="pricing-features"><li>✓ 1 HD image per month</li><li>✓ Only charged on success</li><li>✓ Full resolution PNG</li><li>✓ All background options</li><li>✓ Standard processing</li></ul>
               <button className="pricing-cta secondary" onClick={onClose}>Get Started Free</button>
             </div>
             {PLANS.map(plan => (
@@ -198,7 +170,6 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
-        {/* Login prompt */}
         {selectedPlan && showLoginPrompt && (
           <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
             <button onClick={() => { setShowLoginPrompt(false); setSelectedPlan(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>← Back to plans</button>
@@ -208,38 +179,31 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
-        {/* PayPal checkout */}
         {selectedPlan && isLoggedIn && !showLoginPrompt && (
           <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
-            <button onClick={() => { setSelectedPlan(null); paypalRenderedRef.current = false; }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>← Back to plans</button>
+            <button onClick={handleBackToPlans} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>← Back to plans</button>
             <h3 style={{ marginBottom: 16 }}>{PLANS.find(p => p.key === selectedPlan)?.name} — {PLANS.find(p => p.key === selectedPlan)?.price}</h3>
-            {loadingPayPal ? (
-              <div style={{ minHeight: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+
+            {status === 'loading' && (
+              <div ref={btnContainerRef} style={{ minHeight: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="spinner dark" style={{ width: 32, height: 32, borderWidth: 3 }} />
-                <p style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>Loading payment form…</p>
               </div>
-            ) : (
-              <div id="paypal-btn-container" style={{ minHeight: 150 }} />
             )}
+
+            {status === 'idle' && (
+              <div style={{ minHeight: 150 }} />
+            )}
+
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>🔒 Sandbox mode — no real money will be charged</p>
           </div>
         )}
 
-        {/* Policies (shown on plan grid) */}
         {!selectedPlan && (
           <>
-            <div className="pricing-policies">
-              {POLICIES.map(p => (
-                <div key={p.title} className="policy-item">
-                  <span className="policy-icon">{p.icon}</span>
-                  <div><strong>{p.title}</strong><p>{p.desc}</p></div>
-                </div>
-              ))}
-            </div>
-            <p className="pricing-footer-note">
-              Need more than 80 images/month? <a href="mailto:lichaoming0@gmail.com">Contact us</a> for a custom plan.
-              {credits > 0 && <span style={{ marginLeft: 12, color: 'var(--color-primary)', fontWeight: 600 }}>Your credits: {credits}</span>}
-            </p>
+            <div className="pricing-policies">{POLICIES.map(p => (
+              <div key={p.title} className="policy-item"><span className="policy-icon">{p.icon}</span><div><strong>{p.title}</strong><p>{p.desc}</p></div></div>
+            ))}</div>
+            <p className="pricing-footer-note">Need more than 80 images/month? <a href="mailto:lichaoming0@gmail.com">Contact us</a> for a custom plan.{credits > 0 && <span style={{ marginLeft: 12, color: 'var(--color-primary)', fontWeight: 600 }}>Your credits: {credits}</span>}</p>
           </>
         )}
       </div>
