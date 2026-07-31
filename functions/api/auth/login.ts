@@ -9,10 +9,11 @@ interface Env {
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  let code: string;
+  let code: string; let redirectUri: string;
   try {
-    const body = await request.json() as { code?: string };
+    const body = await request.json() as { code?: string; redirect_uri?: string };
     code = body.code || '';
+    redirectUri = body.redirect_uri || 'https://removeimagesbg.shop';
   } catch {
     return json({ error: 'Invalid request' }, 400);
   }
@@ -30,7 +31,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code, client_id: clientId, client_secret: clientSecret,
-        redirect_uri: 'https://removeimagesbg.shop', grant_type: 'authorization_code',
+        redirect_uri: redirectUri, grant_type: 'authorization_code',
       }).toString(),
     });
     if (!tokenRes.ok) return json({ error: 'Invalid auth code' }, 401);
