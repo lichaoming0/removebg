@@ -8,6 +8,37 @@ interface Env {
   GOOGLE_CLIENT_SECRET: string;
 }
 
+async function exchangeToken(
+  code: string, clientId: string, clientSecret: string, redirectUri: string
+): Promise<{ idToken?: string; error?: string }> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code, client_id: clientId, client_secret: clientSecret,
+      redirect_uri: redirectUri, grant_type: 'authorization_code',
+    }).toString(),
+  });
+  const data = await res.json() as { id_token?: string; error?: string; error_description?: string };
+  if (!res.ok) {
+    return { error: `${data.error || 'unknown'}: ${data.error_description || ''}`.trim() };
+  }
+  if (!data.id_token) return { error: 'No id_token in response' };
+  return { idToken: data.id_token };
+}
+
+async function tryExchange(
+  code: string, clientId: string, clientSecret: string, uris: string[]
+): Promise<{ idToken: string; usedUri: string }> {
+  const errors: string[] = [];
+  for (const uri of uris) {
+    const result = await exchangeToken(code, clientId, clientSecret, uri);
+    if (result.idToken) return { idToken: result.idToken, usedUri: uri };
+    errors.push(`  ${uri} → ${result.error}`);
+  }
+  throw new Error(`Token exchange failed for all redirect_uri candidates:\n${errors.join('\n')}`);
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let code: string; let redirectUri: string;
   try {
@@ -23,24 +54,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const clientSecret = env.GOOGLE_CLIENT_SECRET;
   if (!clientSecret) return json({ error: 'Server not configured: missing Google client secret' }, 500);
 
-  // Exchange auth code for id_token
+  // Build list of redirect_uri candidates to try
+  const candidates: string[] = [redirectUri];
+  // Add trailing-slash variant
+  if (!redirectUri.endsWith('/')) candidates.push(redirectUri + '/');
+  else candidates.push(redirectUri.replace(/\/$/, ''));
+  // Add hardcoded defaults (deduplicated)
+  const defaults = ['https://removeimagesbg.shop', 'https://removeimagesbg.shop/'];
+  for (const d of defaults) {
+    if (!candidates.includes(d)) candidates.push(d);
+  }
+
+  // Exchange auth code for id_token (try all candidates)
   let idToken: string;
   try {
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code, client_id: clientId, client_secret: clientSecret,
-        redirect_uri: redirectUri, grant_type: 'authorization_code',
-      }).toString(),
-    });
-    if (!tokenRes.ok) return json({ error: 'Invalid auth code' }, 401);
-    const tokens = await tokenRes.json() as { id_token?: string };
-    idToken = tokens.id_token || '';
-    if (!idToken) return json({ error: 'No id_token returned' }, 500);
+    const result = await tryExchange(code, clientId, clientSecret, candidates);
+    idToken = result.idToken;
+    console.log(`OAuth token exchange successful with redirect_uri: ${result.usedUri}`);
   } catch (err: any) {
     console.error('Token exchange error:', err.message);
-    return json({ error: 'Failed to verify with Google' }, 500);
+    return json({ error: 'Invalid auth code', detail: err.message }, 401);
   }
 
   // Decode JWT
