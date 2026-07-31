@@ -94,8 +94,8 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           setStatus('success');
         }
       },
-      onCancel: () => setStatus('cancel'),
-      onError: (err: any) => console.error('PayPal error:', err),
+      onCancel: () => { setStatus('cancel'); },
+      onError: (err: any) => { console.error('PayPal error:', err); alert('PayPal error: ' + (err?.message || 'Unknown error')); },
     }).render('#paypal-btn-container');
   };
 
@@ -112,10 +112,23 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setLoadingPayPal(true);
     const ready = await waitForPaypal();
     setLoadingPayPal(false);
-    if (!ready) return;
+    if (!ready) {
+      alert('PayPal SDK failed to load. Please check your network and try again.');
+      return;
+    }
 
-    // Wait for React to paint the container div, then render PayPal ONCE
-    setTimeout(() => renderPaypalOnce(planKey), 100);
+    // Retry until the container div exists (React may not have painted it yet)
+    let retries = 0;
+    const tryRender = () => {
+      const container = document.getElementById('paypal-btn-container');
+      if (container) {
+        renderPaypalOnce(planKey);
+      } else if (retries < 20) {
+        retries++;
+        setTimeout(tryRender, 100);
+      }
+    };
+    setTimeout(tryRender, 100);
   };
 
   // ---- Render states ----
