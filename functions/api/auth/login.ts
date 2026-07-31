@@ -39,12 +39,17 @@ async function tryExchange(
   throw new Error(`Token exchange failed for all redirect_uri candidates:\n${errors.join('\n')}`);
 }
 
+function dedupe(arr: string[]): string[] {
+  return [...new Set(arr)];
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  let code: string; let redirectUri: string;
+  let code: string; let redirectUri: string; let fullUri: string;
   try {
-    const body = await request.json() as { code?: string; redirect_uri?: string };
+    const body = await request.json() as { code?: string; redirect_uri?: string; full_uri?: string };
     code = body.code || '';
     redirectUri = body.redirect_uri || 'https://removeimagesbg.shop';
+    fullUri = body.full_uri || '';
   } catch {
     return json({ error: 'Invalid request' }, 400);
   }
@@ -54,16 +59,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const clientSecret = env.GOOGLE_CLIENT_SECRET;
   if (!clientSecret) return json({ error: 'Server not configured: missing Google client secret' }, 500);
 
-  // Build list of redirect_uri candidates to try
-  const candidates: string[] = [redirectUri];
-  // Add trailing-slash variant
-  if (!redirectUri.endsWith('/')) candidates.push(redirectUri + '/');
-  else candidates.push(redirectUri.replace(/\/$/, ''));
-  // Add hardcoded defaults (deduplicated)
-  const defaults = ['https://removeimagesbg.shop', 'https://removeimagesbg.shop/'];
-  for (const d of defaults) {
-    if (!candidates.includes(d)) candidates.push(d);
-  }
+  // Build list of redirect_uri candidates: the Google GIS initCodeClient default
+  // is origin + pathname (no query/hash). Try all plausible variants.
+  const candidates = dedupe([
+    redirectUri,
+    redirectUri + '/',
+    fullUri,
+    fullUri + '/',
+    'https://removeimagesbg.shop',
+    'https://removeimagesbg.shop/',
+  ].filter(Boolean));
 
   // Exchange auth code for id_token (try all candidates)
   let idToken: string;

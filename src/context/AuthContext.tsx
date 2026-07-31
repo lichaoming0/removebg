@@ -70,10 +70,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (code: string) => {
     setLoading(true);
     try {
+      // Google GIS initCodeClient default redirect_uri = origin + pathname (no query/hash)
+      const origin = window.location.origin;
+      const pathname = window.location.pathname;
+      const fullUri = (origin + pathname).replace(/\/$/, '') || origin;
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, redirect_uri: window.location.origin }),
+        body: JSON.stringify({ code, redirect_uri: origin, full_uri: fullUri }),
       });
       const data = await res.json();
       if (data.user) {
@@ -84,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCredits(serverCredits);
         saveCredits(serverCredits);
       } else {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.detail || data.error || 'Login failed');
       }
     } catch (err) {
       throw err;
