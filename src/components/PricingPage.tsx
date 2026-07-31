@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface Plan {
@@ -56,6 +56,20 @@ const POLICIES = [
 ];
 
 const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
+const PAYPAL_SDK_URL = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+
+function waitForPaypal(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).paypal) { resolve(true); return; }
+    let attempts = 0;
+    const maxAttempts = 100; // 10 seconds at 100ms intervals
+    const timer = setInterval(() => {
+      attempts++;
+      if ((window as any).paypal) { clearInterval(timer); resolve(true); return; }
+      if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
+    }, 100);
+  });
+}
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { isLoggedIn, credits, addCredits, user } = useAuth();
@@ -63,31 +77,84 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [status, setStatus] = useState<'idle' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [paypalReady, setPaypalReady] = useState(false);
+  const [paypalLoading, setPaypalLoading] = useState(false);
+  const renderedPlanRef = useRef<string | null>(null);
 
-  // Load PayPal SDK with onload callback
+  // Load PayPal SDK on mount
   useEffect(() => {
-    if (document.querySelector('#paypal-sdk')) {
-      // Script already exists — check if already loaded
-      if ((window as any).paypal) {
-        setPaypalReady(true);
-      }
+    // Already loaded — check immediately
+    if ((window as any).paypal) {
+      setPaypalReady(true);
       return;
     }
+
+    // Script already in DOM but not loaded yet — poll for it
+    if (document.querySelector('#paypal-sdk')) {
+      waitForPaypal().then((ready) => { if (ready) setPaypalReady(true); });
+      return;
+    }
+
+    // Create and inject the SDK script
     const script = document.createElement('script');
     script.id = 'paypal-sdk';
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+    script.src = PAYPAL_SDK_URL;
     script.async = true;
-    script.onload = () => setPaypalReady(true);
-    script.onerror = () => console.error('PayPal SDK failed to load');
+    script.onload = () => { setPaypalReady(true); };
+    script.onerror = () => { console.error('PayPal SDK failed to load'); };
     document.body.appendChild(script);
+
+    return () => {
+      // Don't remove the script — it may be used by other components
+    };
   }, []);
 
-  // Render PayPal button when plan selected and SDK loaded
-  const renderButton = useCallback((containerId: string, planKey: string) => {
-    const container = document.getElementById(containerId);
-    if (!container || !(window as any).paypal) return;
+  // Handle "Buy Now" click
+  const handleBuyNow = useCallback(async (planKey: string) => {
+    setSelectedPlan(planKey);
+    renderedPlanRef.current = null;
+
+    if (!isLoggedIn) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    // PayPal not ready yet — show loading and wait
+    if (!(window as any).paypal) {
+      setPaypalLoading(true);
+      const ready = await waitForPaypal();
+      setPaypalLoading(false);
+      if (!ready) {
+        setStatus('cancel'); // reuse cancel page to show error
+        return;
+      }
+      setPaypalReady(true);
+    }
+
+    // Small delay to ensure React has rendered the container div
+    setTimeout(() => renderPaypalButton(planKey), 50);
+  }, [isLoggedIn]);
+
+  // Render the PayPal button into the container
+  const renderPaypalButton = useCallback((planKey: string) => {
+    const container = document.getElementById('paypal-btn-container');
+    if (!container) {
+      console.error('PayPal container not found');
+      return;
+    }
+
+    const paypal = (window as any).paypal;
+    if (!paypal) {
+      console.error('PayPal SDK not available');
+      return;
+    }
+
+    // Avoid re-rendering the same plan
+    if (renderedPlanRef.current === planKey) return;
+    renderedPlanRef.current = planKey;
+
     container.innerHTML = '';
-    (window as any).paypal.Buttons({
+
+    paypal.Buttons({
       style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
       createOrder: async () => {
         const res = await fetch('/api/paypal/create-order', {
@@ -113,16 +180,17 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       },
       onCancel: () => { setStatus('cancel'); },
       onError: (err: any) => { console.error('PayPal error:', err); },
-    }).render(`#${containerId}`);
+    }).render('#paypal-btn-container');
   }, [addCredits, user?.google_id]);
 
+  // Re-render PayPal button when SDK becomes ready and a plan is selected
   useEffect(() => {
-    if (selectedPlan && paypalReady) {
-      // Small delay to ensure DOM is painted
-      const timer = setTimeout(() => renderButton('paypal-btn-container', selectedPlan), 50);
-      return () => clearTimeout(timer);
+    if (selectedPlan && paypalReady && isLoggedIn && !showLoginPrompt) {
+      setTimeout(() => renderPaypalButton(selectedPlan), 50);
     }
-  }, [selectedPlan, paypalReady, renderButton]);
+  }, [selectedPlan, paypalReady, isLoggedIn, showLoginPrompt, renderPaypalButton]);
+
+  // ---- Render ----
 
   if (status === 'success') {
     const plan = PLANS.find((p) => p.key === selectedPlan);
@@ -198,10 +266,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </ul>
                 <button
                   className="pricing-cta primary"
-                  onClick={() => {
-                    setSelectedPlan(plan.key);
-                    if (!isLoggedIn) { setShowLoginPrompt(true); return; }
-                  }}
+                  onClick={() => handleBuyNow(plan.key)}
                 >
                   Buy Now
                 </button>
@@ -210,6 +275,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
+        {/* Login prompt for unauthenticated users */}
         {selectedPlan && showLoginPrompt && (
           <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
             <button onClick={() => { setShowLoginPrompt(false); setSelectedPlan(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>
@@ -224,15 +290,33 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </button>
           </div>
         )}
+
+        {/* PayPal checkout for logged-in users */}
         {selectedPlan && isLoggedIn && !showLoginPrompt && (
           <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
-            <button onClick={() => setSelectedPlan(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>
+            <button onClick={() => { setSelectedPlan(null); renderedPlanRef.current = null; }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', marginBottom: 16, fontSize: 14 }}>
               ← Back to plans
             </button>
             <h3 style={{ marginBottom: 16 }}>
               {PLANS.find((p) => p.key === selectedPlan)?.name} — {PLANS.find((p) => p.key === selectedPlan)?.price}
             </h3>
-            <div id="paypal-btn-container" style={{ minHeight: 150 }} />
+
+            {/* Loading state while PayPal SDK initializes */}
+            {paypalLoading && (
+              <div style={{
+                minHeight: 150, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 12,
+              }}>
+                <div className="spinner dark" style={{ width: 32, height: 32, borderWidth: 3 }} />
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>Loading payment form…</p>
+              </div>
+            )}
+
+            {/* PayPal button container */}
+            {!paypalLoading && (
+              <div id="paypal-btn-container" style={{ minHeight: 150 }} />
+            )}
+
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
               🔒 Sandbox mode — no real money will be charged
             </p>
