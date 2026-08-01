@@ -29,7 +29,12 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
         className={`preview-image-wrap ${loading ? 'processing' : ''} ${resultUrl && backgroundStyle ? 'with-bg' : ''}`}
         style={resultUrl && backgroundStyle ? { background: undefined, ...backgroundStyle } : undefined}
       >
-        {loading && <span className="spinner dark" />}
+        {loading && (
+          <div style={{ position: 'absolute', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <span className="spinner dark" style={{ width: 36, height: 36, borderWidth: 3 }} />
+            <span style={{ color: 'var(--color-primary)', fontSize: 13, fontWeight: 600 }}>Processing…</span>
+          </div>
+        )}
         {resultUrl ? (
           <img className="preview-image" src={resultUrl} alt="Result" />
         ) : (
