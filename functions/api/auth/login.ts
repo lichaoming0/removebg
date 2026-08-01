@@ -74,9 +74,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         .bind(name, email, picture, sub).run();
       return json({ user: { id: exist.id, google_id: sub, name, email, picture, credits: exist.credits || 0 } });
     }
-    const ins = await env.DB.prepare('INSERT INTO users (google_id,name,email,picture,credits) VALUES (?,?,?,?,0)')
+    const ins = await env.DB.prepare('INSERT INTO users (google_id,name,email,picture,credits) VALUES (?,?,?,?,1)')
       .bind(sub, name, email, picture).run();
-    return json({ user: { id: ins.meta?.last_row_id || 0, google_id: sub, name, email, picture, credits: 0 } }, 201);
+    return json({ user: { id: ins.meta?.last_row_id || 0, google_id: sub, name, email, picture, credits: 1 } }, 201);
   } catch (err: any) {
     console.error('D1 error:', err.message);
     return json({ error: 'Database error' }, 500);

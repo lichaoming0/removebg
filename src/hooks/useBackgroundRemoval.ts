@@ -6,20 +6,25 @@ export function useBackgroundRemoval() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
-  const process = useCallback(async (file: File) => {
+  const process = useCallback(async (file: File, googleId?: string) => {
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     setResultBlob(null);
     setResultUrl(null);
 
     try {
-      const result = await removeBackground(file);
+      const result = await removeBackground(file, googleId);
       setResultBlob(result.blob);
       setResultUrl(result.url);
-    } catch (err) {
+      return result.credits;
+    } catch (err: any) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
+      setErrorCode(err.code || null);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -31,7 +36,8 @@ export function useBackgroundRemoval() {
     setResultUrl(null);
     setLoading(false);
     setError(null);
+    setErrorCode(null);
   }, [resultUrl]);
 
-  return { resultBlob, resultUrl, loading, error, process, reset };
+  return { resultBlob, resultUrl, loading, error, errorCode, process, reset };
 }

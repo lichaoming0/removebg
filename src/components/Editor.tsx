@@ -14,6 +14,7 @@ interface EditorProps {
   error?: string | null;
   onRemoveBg: () => void;
   onReset: () => void;
+  onUpgrade?: () => void;
 }
 
 const Editor: React.FC<EditorProps> = ({
@@ -24,6 +25,7 @@ const Editor: React.FC<EditorProps> = ({
   error,
   onRemoveBg,
   onReset,
+  onUpgrade,
 }) => {
   const [background, setBackground] = useState<BackgroundOption>({ type: 'transparent' });
   const [compositeUrl, setCompositeUrl] = useState<string | null>(null);
@@ -138,11 +140,18 @@ const Editor: React.FC<EditorProps> = ({
       />
 
       {phase === 'error' && error && (
-        <ErrorBanner
-          message={error}
-          onDismiss={() => {}}
-          onRetry={onRemoveBg}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+          <ErrorBanner
+            message={error}
+            onDismiss={() => {}}
+            onRetry={error.includes('Out of credits') || error.includes('upgrade') ? undefined : onRemoveBg}
+          />
+          {error.includes('Out of credits') && onUpgrade && (
+            <button className="pricing-cta primary" onClick={onUpgrade} style={{ maxWidth: 240 }}>
+              Upgrade Plan
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

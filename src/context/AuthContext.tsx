@@ -17,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   credits: number;
   addCredits: (amount: number) => void;
+  setCredits: (amount: number) => void;
   syncCredits: () => Promise<void>;
 }
 
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   credits: 0,
   addCredits: () => {},
+  setCredits: () => {},
   syncCredits: async () => {},
 });
 
@@ -106,6 +108,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const updateCredits = useCallback((amount: number) => {
+    setCredits(amount);
+    saveCredits(amount);
+  }, []);
+
   const syncCredits = useCallback(async () => {
     const u = loadUser();
     if (!u) return;
@@ -126,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading, credits, addCredits, syncCredits }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, loading, credits, addCredits, setCredits: updateCredits, syncCredits }}>
       {children}
     </AuthContext.Provider>
   );

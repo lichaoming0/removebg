@@ -59,7 +59,7 @@ const AppContent: React.FC = () => {
   const [state, dispatch] = useReducer(reducer, { phase: 'idle' });
   const { resultUrl, loading, error, process, reset: resetRemoval } = useBackgroundRemoval();
   const [showPricing, setShowPricing] = useState(false);
-  const { isLoggedIn, syncCredits } = useAuth();
+  const { isLoggedIn, syncCredits, setCredits, user } = useAuth();
 
   const originalUrlRef = useRef<string | null>(null);
 
@@ -86,13 +86,14 @@ const AppContent: React.FC = () => {
     const { original } = state;
     dispatch({ type: 'START_PROCESSING' });
     try {
-      await process(original);
+      const newCredits = await process(original, user?.google_id);
       await new Promise((r) => setTimeout(r, 0));
+      if (newCredits >= 0) setCredits(newCredits);
       dispatch({ type: 'PROCESS_SUCCESS' });
     } catch {
       // error synced via useEffect below
     }
-  }, [state, process]);
+  }, [state, process, user?.google_id, setCredits]);
 
   useEffect(() => {
     if (error && state.phase === 'processing') {
@@ -145,6 +146,7 @@ const AppContent: React.FC = () => {
             error={state.phase === 'error' ? state.error : null}
             onRemoveBg={handleRemoveBg}
             onReset={handleReset}
+            onUpgrade={() => setShowPricing(true)}
           />
         )}
       </main>
