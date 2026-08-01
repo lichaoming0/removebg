@@ -15,17 +15,17 @@ const POLICIES = [
 const PAYPAL_CLIENT_ID = 'AZ9Rg96Qn_61M3Iu9zIMo-NXaWmq4c4IN_1B2MBlbLYIB_zTDddAzAu9YSx06U7DmCFQDs_GNT0jCx9U';
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { isLoggedIn, credits, addCredits, user } = useAuth();
+  const { isLoggedIn, credits, setCredits, user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'cancel'>('idle');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const btnContainerRef = useRef<HTMLDivElement>(null);
   const paypalBtnRef = useRef<any>(null);
   const userRef = useRef(user);
-  const addCreditsRef = useRef(addCredits);
+  const setCreditsRef = useRef(setCredits);
   const planRef = useRef('');
   userRef.current = user;
-  addCreditsRef.current = addCredits;
+  setCreditsRef.current = setCredits;
 
   // Load PayPal SDK
   useEffect(() => {
@@ -71,7 +71,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         });
         const r = await res.json();
         if (r.success) {
-          addCreditsRef.current(r.credits);
+          setCreditsRef.current(r.credits);
           setStatus('success');
         } else {
           alert('Capture failed: ' + (r.error || 'Unknown'));
