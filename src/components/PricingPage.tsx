@@ -67,7 +67,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const res = await fetch('/api/paypal/capture-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: data.orderId, plan: planKey, google_id: userRef.current?.google_id || '' }),
+          body: JSON.stringify({ orderId: data.orderID, plan: planKey, google_id: userRef.current?.google_id || '' }),
         });
         const r = await res.json();
         if (r.success) {
