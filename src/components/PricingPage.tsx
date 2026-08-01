@@ -12,7 +12,7 @@ const POLICIES = [
   { icon: '📅', title: 'Monthly reset', desc: 'Credits reset each billing month. Unused credits do not roll over.' },
 ];
 
-const PAYPAL_CLIENT_ID = 'Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI';
+const PAYPAL_CLIENT_ID = 'AZ9Rg96Qn_61M3Iu9zIMo-NXaWmq4c4IN_1B2MBlbLYIB_zTDddAzAu9YSx06U7DmCFQDs_GNT0jCx9U';
 
 const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { isLoggedIn, credits, addCredits, user } = useAuth();
@@ -60,7 +60,7 @@ const PricingPage: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           body: JSON.stringify({ plan: planKey }),
         });
         const d = await res.json();
-        if (!d.orderId) throw new Error(d.error || 'Failed to create order');
+        if (!d.orderId) throw new Error(d.error + (d.detail ? ': ' + JSON.stringify(d.detail) : '') || 'Failed to create order');
         return d.orderId;
       },
       onApprove: async (data: any) => {

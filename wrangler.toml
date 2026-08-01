@@ -9,5 +9,5 @@ database_id = "7a06a2fe-90d7-492a-9c61-9ef6a651b710"
 
 [vars]
 GOOGLE_CLIENT_ID = "974859501286-sa67i61lon92g2d77ap1m2pv5d4memtb.apps.googleusercontent.com"
-PAYPAL_CLIENT_ID = "Ac8s_D3tEG7BTjjHg9QyPAD9jtHgcXOx_yE7q6ExRglTmBf3kt4eSVATLU9fZhUgs3KpdIR6OyfrBeNI"
+PAYPAL_CLIENT_ID = "AZ9Rg96Qn_61M3Iu9zIMo-NXaWmq4c4IN_1B2MBlbLYIB_zTDddAzAu9YSx06U7DmCFQDs_GNT0jCx9U"
 # PAYPAL_CLIENT_SECRET — set via Cloudflare Dashboard > Pages > Settings > Environment variables (encrypted)
